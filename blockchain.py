@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, jsonify, request
 import hashlib
 import json
 import time
@@ -133,9 +133,18 @@ def mine():
     return 'Will add a new block'
 
 
-@app.route('/transactions/new', methods=['GET'])
+@app.route('/transactions/new', methods=['POST'])
 def new_transaction():
-    return 'Will add a new transaction'
+    values = request.get_json()
+    required = ['sender', 'recipient', 'amount']
+    if not all(k in values for k in required):
+        return 'Missing values', 400
+
+    # 创建一个新的交易
+    index = blockchain.new_transaction(values['sender'], values['recipient'], values['amount'])
+    response = {'message': 'Transaction will be added to Blcok %s' % index}
+
+    return jsonify(response), 201
 
 
 @app.route('/chain', methods=['GET'])
@@ -144,7 +153,7 @@ def full_chain():
         'chain': blockchain.chain,
         'length': len(blockchain.chain)
     }
-    return json.jsonify(response), 200
+    return jsonify(response), 200
 
 
 if __name__ == '__main__':
