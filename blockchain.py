@@ -79,7 +79,7 @@ class Blockchain(object):
 
         # 必须要确保block是有序的,按时间序列的...否则容易发送hash冲突
         block_string = json.dumps(block, sort_keys=True).encode()
-        return hashlib.sha256(block_string).hexdiest()
+        return hashlib.sha256(block_string).hexdigest()
 
     @property
     def last_block(self):
@@ -116,7 +116,7 @@ class Blockchain(object):
         :return: <bool> true代表正确, false代表不行
         """
 
-        guess = '{last_proof}{proof}'.format(last_proof, proof)
+        guess = ('%s%s' % (last_proof, proof)).encode()
         guess_hash = hashlib.sha256(guess).hexdigest()
         return guess_hash[:4] == "0000"
 
@@ -130,12 +130,36 @@ blockchain = Blockchain()
 
 @app.route('/mine', methods=['GET'])
 def mine():
-    return 'Will add a new block'
+    last_block = blockchain.last_block
+    last_proof = last_block['proof']
+    proof = blockchain.proof_of_work(last_proof)    # 挖矿, 难度较高时比较耗时间
+
+    # 给工作量证明的节点提供奖励
+    # 发送者为 '0'表名是新挖出的的币
+    blockchain.new_transaction(
+        sender="0",
+        recipient='node_identifier',
+        amount=1
+    )
+
+    # 给链上添加一个新的Block
+    block = blockchain.new_block(proof)
+    response = {
+        'message': "New Block Forged",
+        'index': block['index'],
+        'transactions': block['transactions'],
+        'proof': block['proof'],
+        'previous_hash': block['previous_hash']
+    }
+    return jsonify(response), 200
 
 
 @app.route('/transactions/new', methods=['POST'])
 def new_transaction():
+    print(dir(request))
+
     values = request.get_json()
+    print(values)
     required = ['sender', 'recipient', 'amount']
     if not all(k in values for k in required):
         return 'Missing values', 400
