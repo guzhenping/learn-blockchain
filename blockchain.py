@@ -1,6 +1,7 @@
 import hashlib
 import json
 import time
+from uuid import uuid4
 
 
 class Blockchain(object):
@@ -12,7 +13,8 @@ class Blockchain(object):
         self.new_block(previous_hash=1, proof=100)
 
     def new_block(self, proof, previous_hash=None):
-        """创建一个想的数据块,并加入的链上.
+        """
+        创建一个想的数据块,并加入的链上.
         desigh of block: 索引,Unix时间戳,交易列表,工作量证明,前一个区块的hash值. eg:
         block = {
             'index': 1,
@@ -46,7 +48,8 @@ class Blockchain(object):
         return block
 
     def new_transaction(self, sender, recipient, amount):
-        """添加一个想的交易到交易列表中
+        """
+        添加一个想的交易到交易列表中
         生成一个新的交易信息,信息将加入的像一个带外的区块中.
 
         :param sender: <str> Sender的地址
@@ -65,7 +68,8 @@ class Blockchain(object):
 
     @staticmethod
     def hash(block):
-        """对一个block进行hash.
+        """
+        对一个block进行hash.
         生成block的SHA-256 hash值.
 
         :param block: <dict> Block
@@ -78,9 +82,39 @@ class Blockchain(object):
 
     @property
     def last_block(self):
-        """返回链上最新的数据块.
+        """
+        返回链上最新的数据块.
 
         :return: <dict>
         """
 
         return self.chain[-1]
+
+    def proof_of_work(self, last_proof):
+        """
+        一个简单的工作量证明:
+        - 查找一个 p' 使得 hash(pp') 以4个0开头
+        - p是上一个block的证明, p'是当前block的证明
+
+        :param last_proof: <int> 上一个block的工作量证明
+        :return: <int>
+        """
+
+        proof = 0
+        while self.valid_proof(last_proof, proof) is False:
+            proof += 1
+        return proof
+
+    @staticmethod
+    def valid_proof(last_proof, proof):
+        """
+        验证: 是否hash(last_proof, proof)以4个0开头?
+
+        :param last_proof: <int> 上一个证明
+        :param proof: <int> 当前的证明
+        :return: <bool> true代表正确, false代表不行
+        """
+
+        guess = '{last_proof}{proof}'.format(last_proof, proof)
+        guess_hash = hashlib.sha256(guess).hexdigest()
+        return guess_hash[:4] == "0000"
