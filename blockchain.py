@@ -1,22 +1,98 @@
 from flask import Flask, jsonify, request
 import hashlib
 import json
+import requests
 import time
 from uuid import uuid4
+from urllib.parse import urlparse
 
 
 class Blockchain(object):
     def __init__(self):
         self.chain = []
         self.current_transaction = []
+        self.nodes = set()
 
         # 创建创始块(genesis block)
         self.new_block(previous_hash=1, proof=100)
 
+    def register_node(self, address):
+        """
+        添加一个新的节点到节点集合中.
+
+        :param address: <str> 节点地址, Eg: 'http://192.168.0.5:5000'
+        :return: None
+        """
+
+        parsed_url = urlparse(address)
+        self.nodes.add(parsed_url)
+
+    def valid_chain(self, chain):
+        """
+        决定一条链是否合法.
+
+        :param chain: <list> 一条链
+        :return: <bool> true代表合法, false代表不合法
+        """
+
+        last_block = chain[0]
+        current_index = 1
+
+        while current_index < len(chain):
+            block = chain[current_index]
+            print('%s' % last_block)
+            print('%s' % block)
+            print('\n-------------------\n')
+
+            # 检测这个数据块的hash是否合法
+            if block['previous_hash'] != self.hash(last_block):
+                return False
+
+            # 检测工作量证明是否合法
+            if not self.valid_proof(last_block['proof'], block['proof']):
+                return False
+
+            last_block = block
+            current_index += 1
+        return True
+
+    def resolve_conflicts(self):
+        """
+        共识算法解决冲突.
+        使用网络中最长的链.
+
+        :return: <bool> true 链被取代, false
+        """
+
+        neighbours = self.nodes
+        new_chain = None
+
+        # 用来寻找最长的链
+        max_length = len(self.chain)
+
+        # 遍历所有的节点
+        for node in neighbours:
+            response = requests.get('http://%s/chain' % node)
+            if response.status_code == 200:
+                length = response.json()['length']
+                chain = response.json()['chain']
+
+                # 检测这条的链的长度,以及是否合法
+                if length > max_length and self.valid_chain(chain):
+                    max_length = length
+                    new_chain = chain
+
+        # 如果找到了最长的链,就替换自己的
+        if new_chain:
+            self.chain = new_chain
+            return True
+
+        return False
+
     def new_block(self, proof, previous_hash=None):
         """
         创建一个想的数据块,并加入的链上.
-        desigh of block: 索引,Unix时间戳,交易列表,工作量证明,前一个区块的hash值. eg:
+        desigh of block: 索引,Unix时间戳,交易列表,工作量证明,前一个区块的hash值. Eg:
         block = {
             'index': 1,
             'timestamp': 1520328303.51874,
